@@ -33,3 +33,12 @@ library
   else
     cpp-options:      -DUSE_FLOCK
     build-depends:    unix
+
+executable test-filelock
+  hs-source-dirs: tests
+  main-is: test.hs
+  build-depends: base
+               , async
+               , filelock
+               , process
+  default-language: Haskell2010

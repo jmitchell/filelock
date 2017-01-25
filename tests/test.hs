@@ -3,6 +3,7 @@
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.Async
+import Debug.Trace (trace)
 import System.Environment
 import System.Exit
 import System.Process
@@ -31,8 +32,10 @@ main = do
 
 callSelf :: [String] -> IO ()
 callSelf args = do
-  self <- getProgName
-  ExitSuccess <- rawSystem ("./" ++ self) args
+  result <- trace "Attempting to call self" $ rawSystem ".\\bin\\test-filelock.exe" args
+  case result of
+    ExitSuccess -> putStrLn "callSelf succeeded"
+    x -> putStrLn $ "callSelf encountered unexpected exit code: " ++ show x
   return ()
 
 msleep :: Int -> IO ()
@@ -42,10 +45,12 @@ holdLock :: String -> SharedExclusive -> Int -> IO ()
 holdLock ty sex duration = do
   withFileLock lockfile sex $ \_ -> do
     putStrLn $ "took " ++ desc
+    if sex == Exclusive then testWrite else return ()
     msleep duration
   putStrLn $ "released " ++ desc
   where
     desc = ty ++ " lock"
+    testWrite = trace "attempting write..." $ writeFile lockfile "testing"
 
 tryTakingLock :: IO ()
 tryTakingLock = do
