@@ -24,7 +24,7 @@ module System.FileLock
   ( FileLock
   , SharedExclusive(..)
   , lockFile
-  , tryLockFile
+  -- , tryLockFile
   , unlockFile
   , withFileLock
   ) where
@@ -35,6 +35,7 @@ import Control.Monad
 import Data.IORef
 import Data.Traversable (traverse)
 import Data.Typeable
+import Debug.Trace
 
 #ifdef USE_FLOCK
 import qualified System.FileLock.Internal.Flock as I
@@ -54,7 +55,9 @@ instance Eq FileLock where
   Lock _ x == Lock _ y = x == y
 
 newLock :: I.Lock -> IO FileLock
-newLock x = Lock x <$> newIORef True
+newLock x = trace "FL.newLock: start" $ do
+  result <- Lock x <$> newIORef True
+  trace "FL.newLock: end" $ return result
 
 -- | A type of lock to be taken.
 data SharedExclusive
@@ -64,19 +67,24 @@ data SharedExclusive
 
 -- | Take a lock. This function blocks until the lock is available.
 lockFile :: FilePath -> SharedExclusive -> IO FileLock
-lockFile path mode = newLock =<< I.lock path (mode == Exclusive)
+lockFile path mode = trace "FL.lockFile: start" $ do
+  fl <- newLock =<< I.lock path (mode == Exclusive)
+  trace "FL.lockFile: end" $ return fl
 
 -- | Try to take a lock. This function does not block. If the lock is not
 -- immediately available, it returns Nothing.
-tryLockFile :: FilePath -> SharedExclusive -> IO (Maybe FileLock)
-tryLockFile path mode = traverse newLock =<< I.tryLock path (mode == Exclusive)
+-- tryLockFile :: FilePath -> SharedExclusive -> IO (Maybe FileLock)
+-- tryLockFile path mode = traverse newLock =<< I.tryLock path (mode == Exclusive)
 
 -- | Release the lock.
 unlockFile :: FileLock -> IO ()
-unlockFile (Lock l ref) = do
+unlockFile (Lock l ref) = trace "FL.unlockFile: start" $ do
   wasAlive <- atomicModifyIORef ref $ \old -> (False, old)
   when wasAlive $ I.unlock l
+  trace "FL.unlockFile: end" $ return ()
 
 -- | Perform some action with a lock held.
 withFileLock :: FilePath -> SharedExclusive -> (FileLock -> IO a) -> IO a
-withFileLock path mode = E.bracket (lockFile path mode) unlockFile
+withFileLock path mode action = trace "FL.withLockFile: start" $ do
+  result <- E.bracket (lockFile path mode) unlockFile action
+  trace "FL.withLockFile: end" $ return result
